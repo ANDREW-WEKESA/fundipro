@@ -1,0 +1,7 @@
+node_modules/
+dist/
+server/db/data.json
+.env
+*.log
+shots/
+qa_shots.py
