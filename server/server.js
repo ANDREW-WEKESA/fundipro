@@ -50,6 +50,38 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`FundiPro API running on http://localhost:${PORT}`);
+
+  // Auto-seed on first boot if the database is empty (safe to run on Render free tier)
+  try {
+    const { store } = await import("./db/store.js");
+    const users = store.all("users");
+    if (users.length === 0) {
+      console.log("Database is empty — running seed...");
+      const { default: seed } = await import("./db/seed.js");
+      console.log("Seed complete.");
+    } else {
+      console.log(`Database ready — ${users.length} users found.`);
+    }
+  } catch (e) {
+    console.error("Auto-seed error:", e.message);
+  }
+});
+
+// One-time seed endpoint — call this once to populate the live database
+// Protected by a secret so random people can't reset your data
+app.post("/api/admin/seed", async (req, res) => {
+  const { secret } = req.body || {};
+  if (secret !== (process.env.SEED_SECRET || "fundipro-seed-2026")) {
+    return res.status(403).json({ error: "Wrong secret." });
+  }
+  try {
+    const { store } = await import("./db/store.js");
+    store.reset();
+    await import("./db/seed.js");
+    res.json({ ok: true, message: "Database seeded successfully." });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
